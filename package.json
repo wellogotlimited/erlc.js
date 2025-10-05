@@ -10,15 +10,17 @@
   ],
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     }
   },
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "build:js": "esbuild src/index.ts --bundle --minify --platform=node --target=node18 --format=esm --external:bottleneck --external:zod --outfile=dist/index.js",
+    "build:cjs": "esbuild src/index.ts --bundle --minify --platform=node --target=node18 --format=cjs --external:bottleneck --external:zod --outfile=dist/index.cjs",
     "build:types": "tsc --project tsconfig.build.json",
-    "build": "npm run clean && npm run build:js && npm run build:types",
+    "build": "npm run clean && npm run build:js && npm run build:cjs && npm run build:types",
     "dev": "tsx src/index.ts",
     "prepublishOnly": "npm run build"
   },
