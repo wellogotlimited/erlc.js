@@ -1,8 +1,7 @@
 # liberlc
 
-![npm bundle size](https://img.shields.io/bundlephobia/minzip/liberlc?style=for-the-badge)
-
-![GitHub package.json version](https://img.shields.io/github/package-json/v/wellogotlimited/liberlc?style=for-the-badge)
+[![npm bundle size](https://img.shields.io/bundlephobia/minzip/liberlc?style=for-the-badge)](https://www.npmjs.com/package/liberlc)
+![version](https://img.shields.io/github/package-json/v/wellogotlimited/liberlc?style=for-the-badge)
 
 A production-ready, rate-limited JavaScript/TypeScript wrapper for the
 [PRC Private Server API](https://apidocs.policeroleplay.community/).
