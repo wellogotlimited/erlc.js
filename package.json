@@ -1,6 +1,6 @@
 {
   "name": "liberlc",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A simple, rate-limited JavaScript/TypeScript wrapper for the PRC Private Server API.",
   "type": "module",
   "main": "dist/index.js",
@@ -29,11 +29,11 @@
     "url": "git+https://github.com/wellogotlimited/erlc.js.git"
   },
   "keywords": [
+    "erlc",
+    "roblox",
     "prc",
-    "policeroleplay",
-    "api",
-    "sdk",
-    "typescript"
+    "erlc api",
+    "prc api"
   ],
   "author": "wellogotlimited",
   "license": "MIT",
