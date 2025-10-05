@@ -4,6 +4,53 @@ import { parseRateHeaders, sleep } from "../utils/headers";
 
 type CacheEntry<T = unknown> = { etag: string; data: T };
 
+export enum ErrorCode {
+  /** Unknown error occurred. If this is persistent, contact PRC via an API ticket. */
+  Unknown = 0,
+
+  /** An error occurred communicating with Roblox / the in-game private server. */
+  RobloxCommunicationError = 1001,
+
+  /** An internal system error occurred. */
+  InternalSystemError = 1002,
+
+  /** You did not provide a server-key. */
+  MissingServerKey = 2000,
+
+  /** You provided an incorrectly formatted server-key. */
+  MalformedServerKey = 2001,
+
+  /** You provided an invalid (or expired) server-key. */
+  InvalidServerKey = 2002,
+
+  /** You provided an invalid global API key. */
+  InvalidGlobalApiKey = 2003,
+
+  /** Your server-key is currently banned from accessing the API. */
+  BannedServerKey = 2004,
+
+  /** You did not provide a valid command in the request body. */
+  InvalidCommand = 3001,
+
+  /** The server you are attempting to reach is currently offline (has no players). */
+  ServerOffline = 3002,
+
+  /** You are being rate limited. */
+  RateLimited = 4001,
+
+  /** The command you are attempting to run is restricted. */
+  RestrictedCommand = 4002,
+
+  /** The message you're trying to send is prohibited. */
+  ProhibitedMessage = 4003,
+
+  /** The resource you are accessing is restricted. */
+  RestrictedResource = 9998,
+
+  /** The module running on the in-game server is out of date, please kick all and try again. */
+  OutdatedModule = 9999,
+}
+
 export type HttpClientOptions = {
   baseUrl?: string;
   serverKey: string;
@@ -146,7 +193,9 @@ export class HttpClient {
           }
 
           const isRetryAfter = typeof error.retryAfterMs === "number";
-          const wait = isRetryAfter ? error.retryAfterMs : this.backoff(attempt);
+          const wait = isRetryAfter
+            ? error.retryAfterMs
+            : this.backoff(attempt);
 
           if (wait > 0) {
             if (!isRetryAfter) {
@@ -224,13 +273,32 @@ export class HttpClient {
     }
   }
 
-  private async toHttpError(response: Response) {
-    const body = await response.text().catch(() => "");
+  private async toHttpError(response: Response): Promise<HttpError> {
+    const bodyText = await response.text().catch(() => "");
     const { retryAfterSeconds } = parseRateHeaders(response.headers);
     const retryAfterMs =
-      typeof retryAfterSeconds === "number" ? retryAfterSeconds * 1000 : undefined;
-    const message = body || response.statusText || "Request failed";
-    return new HttpError(response.status, message, retryAfterMs);
+      typeof retryAfterSeconds === "number"
+        ? retryAfterSeconds * 1000
+        : undefined;
+
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(bodyText);
+    } catch {
+      // ignore non-JSON errors
+    }
+
+    const code = parsed?.code as ErrorCode | undefined;
+    const message = parsed?.message || response.statusText || "Request failed";
+    const commandId = parsed?.commandId;
+    const details = parsed ?? bodyText;
+
+    return new HttpError(response.status, message, retryAfterMs, {
+      code,
+      commandId,
+      rawBody: bodyText,
+      details,
+    });
   }
 
   private log(event: string, payload: Record<string, unknown>) {
@@ -241,12 +309,46 @@ export class HttpClient {
 }
 
 export class HttpError extends Error {
+  public readonly status: number;
+  public readonly retryAfterMs?: number;
+  public readonly code?: ErrorCode;
+  public readonly commandId?: string;
+  public readonly rawBody?: string;
+  public readonly details?: unknown;
+
   constructor(
-    public status: number,
+    status: number,
     message: string,
-    public readonly retryAfterMs?: number
+    retryAfterMs?: number,
+    extra?: {
+      code?: ErrorCode;
+      commandId?: string;
+      rawBody?: string;
+      details?: unknown;
+    }
   ) {
-    super(`[${status}] ${message}`);
+    const readableMessage = `[${status}${
+      extra?.code ? `:${extra.code}` : ""
+    }] ${message}`;
+
+    super(readableMessage);
     this.name = "HttpError";
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+    this.code = extra?.code;
+    this.commandId = extra?.commandId;
+    this.rawBody = extra?.rawBody;
+    this.details = extra?.details;
+  }
+
+  format(): string {
+    return [
+      `HTTP ${this.status}${this.code ? ` (Code ${this.code})` : ""}`,
+      `Message: ${this.message.replace(/^\[\d+\] /, "")}`,
+      this.commandId ? `Command ID: ${this.commandId}` : null,
+      this.retryAfterMs ? `Retry After: ${this.retryAfterMs}ms` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
   }
 }

@@ -7,34 +7,60 @@ export const PermissionEnum = z.enum([
   "Server Owner",
 ]);
 
-export const PlayerSchema = z.object({
-  Player: z.string(),
-  Permission: PermissionEnum,
-  Callsign: z.string().optional().nullable(),
-  Team: z.string().optional(),
-});
+export const PlayerSchema = z
+  .object({
+    Player: z.string(),
+    Permission: PermissionEnum,
+    Callsign: z.string().optional().nullable(),
+    Team: z.string().optional(),
+  })
+  .transform(({ Player, ...rest }) => ({
+    Username: Player.split(":")[0],
+    UserId: Player.split(":")[1],
+    ...rest,
+  }));
 
 export const PlayersResponse = z.array(PlayerSchema);
 
-export const JoinLogEntry = z.object({
-  Join: z.boolean(),
-  Timestamp: z.number(),
-  Player: z.string(),
-});
+export const JoinLogEntry = z
+  .object({
+    Join: z.boolean(),
+    Timestamp: z.number(),
+    Player: z.string(),
+  })
+  .transform(({ Player, ...rest }) => ({
+    Username: Player.split(":")[0],
+    UserId: Player.split(":")[1],
+    ...rest,
+  }));
 
-export const KillLogEntry = z.object({
-  Killed: z.string(),
-  Timestamp: z.number(),
-  Killer: z.string(),
-});
+export const KillLogEntry = z
+  .object({
+    Killed: z.string(),
+    Timestamp: z.number(),
+    Killer: z.string(),
+  })
+  .transform(({ Killer, Killed, ...rest }) => ({
+    Killer: {
+      Username: Killer.split(":")[0],
+      UserId: Killer.split(":")[1],
+    },
+    Killed: {
+      Username: Killed.split(":")[0],
+      UserId: Killed.split(":")[1],
+    },
+    ...rest,
+  }));
 
 export const ServerStatus = z.object({
   Name: z.string().optional(),
-  Owner: z.string().optional(),
-  CoOwners: z.array(z.string()).optional(),
-  Players: z.number().optional(),
+  OwnerId: z.number().optional(),
+  CoOwners: z.array(z.number()).optional(),
+  CurrentPlayers: z.number().optional(),
   MaxPlayers: z.number().optional(),
   JoinKey: z.string().optional(),
+  AccVerifiedReq: z.string().optional(),
+  TeamBalance: z.boolean().optional(),
 });
 
 export const CommandLogEntry = z.object({
@@ -43,15 +69,27 @@ export const CommandLogEntry = z.object({
   Command: z.string(),
 });
 
-export const ModCallEntry = z.object({
-  Caller: z.string(),
-  Moderator: z.string().optional().nullable(),
-  Timestamp: z.number(),
-});
+export const ModCallEntry = z
+  .object({
+    Caller: z.string(),
+    Moderator: z.string().optional().nullable(),
+    Timestamp: z.number(),
+  })
+  .transform(({ Moderator, Caller, ...rest }) => ({
+    ...rest,
+    Moderator: Moderator
+      ? {
+          Username: Moderator.split(":")[0],
+          UserId: Moderator.split(":")[1],
+        }
+      : null,
+    Caller: {
+      Username: Caller.split(":")[0],
+      UserId: Caller.split(":")[1],
+    },
+  }));
 
-export const BanEntry = z.object({
-  PlayerId: z.union([z.number(), z.string()]),
-});
+export const BanEntry = z.record(z.string().regex(/^\d+$/), z.string());
 
 export const VehicleEntry = z.object({
   Name: z.string().optional(),
@@ -59,9 +97,9 @@ export const VehicleEntry = z.object({
 });
 
 export const StaffResponse = z.object({
-  CoOwners: z.array(z.string()).optional(),
-  Admins: z.array(z.string()).optional(),
-  Mods: z.array(z.string()).optional(),
+  CoOwners: z.array(z.number()).optional(),
+  Admins: z.record(z.string(), z.string()).optional(),
+  Mods: z.record(z.string(), z.string()).optional(),
 });
 
 export type TServerStatus = z.infer<typeof ServerStatus>;

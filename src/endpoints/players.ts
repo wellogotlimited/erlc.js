@@ -1,15 +1,19 @@
+import z from "zod";
 import { HttpClient } from "../core/http";
-import { PlayersResponse, StaffResponse, BanEntry } from "../types/responses";
+import {
+  PlayersResponse,
+  StaffResponse,
+  BanEntry,
+  PlayerSchema,
+} from "../types/responses";
 
 export class PlayersAPI {
   constructor(private http: HttpClient) {}
 
-  list() {
-    return this.http.request(
-      "/v1/server/players",
-      { method: "GET" },
-      PlayersResponse
-    );
+  async list() {
+    return z
+      .array(PlayerSchema)
+      .parse(await this.http.request("/v1/server/players", { method: "GET" }));
   }
 
   staff() {
@@ -20,12 +24,9 @@ export class PlayersAPI {
     );
   }
 
+  /** @returns {Promise<Record<string, string>>} Map of player IDs to banned usernames. */
   bans() {
-    return this.http.request(
-      "/v1/server/bans",
-      { method: "GET" },
-      BanEntry.array()
-    );
+    return this.http.request("/v1/server/bans", { method: "GET" }, BanEntry);
   }
 
   /**

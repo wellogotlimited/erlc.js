@@ -1,3 +1,4 @@
+import z from "zod";
 import { HttpClient } from "../core/http";
 import {
   JoinLogEntry,
@@ -17,12 +18,10 @@ export class LogsAPI {
     );
   }
 
-  kills() {
-    return this.http.request(
-      "/v1/server/killlogs",
-      { method: "GET" },
-      KillLogEntry.array()
-    );
+  async kills() {
+    return z
+      .array(KillLogEntry)
+      .parse(await this.http.request("/v1/server/killlogs", { method: "GET" }));
   }
 
   commands() {
@@ -33,11 +32,9 @@ export class LogsAPI {
     );
   }
 
-  modCalls() {
-    return this.http.request(
-      "/v1/server/modcalls",
-      { method: "GET" },
-      ModCallEntry.array()
-    );
+  async modCalls() {
+    return z
+      .array(ModCallEntry)
+      .parse(await this.http.request("/v1/server/modcalls", { method: "GET" }));
   }
 }
