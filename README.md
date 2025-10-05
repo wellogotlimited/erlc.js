@@ -19,5 +19,5 @@ A simple, rate-limited JavaScript/TypeScript wrapper for the [PRC Private Server
 ## 📦 Install
 
 ```bash
-npm install erlc.js
-
+npm install erlc.js zod bottleneck
+```
