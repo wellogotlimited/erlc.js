@@ -1,4 +1,4 @@
-# erlc.js
+# liberlc
 
 A simple, rate-limited JavaScript/TypeScript wrapper for the [PRC Private Server API](https://apidocs.policeroleplay.community/).
 
@@ -19,5 +19,5 @@ A simple, rate-limited JavaScript/TypeScript wrapper for the [PRC Private Server
 ## 📦 Install
 
 ```bash
-npm install erlc.js zod bottleneck
+npm install liberlc zod bottleneck
 ```
