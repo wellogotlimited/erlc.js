@@ -1,5 +1,5 @@
 import { ZodSchema } from "zod";
-import { RateCoordinator } from "./limiter";
+import { RateLimiterManager, SmoothRateLimiter } from "./limiter";
 import { parseRateHeaders, sleep } from "../utils/headers";
 
 type CacheEntry<T = unknown> = { etag: string; data: T };
@@ -8,29 +8,37 @@ export type HttpClientOptions = {
   baseUrl?: string;
   serverKey: string;
   rpm?: number; // default 60
+  maxConcurrency?: number;
   retries?: number; // default 3
   userAgent?: string;
   fetch?: typeof fetch;
+  debug?: boolean;
 };
 
 export class HttpClient {
   private readonly baseUrl: string;
   private readonly serverKey: string;
-  private readonly limiter: RateCoordinator;
+  private readonly limiters: RateLimiterManager;
   private readonly retries: number;
   private readonly userAgent?: string;
   private readonly fetchImpl: typeof fetch;
   private readonly etagCache: Map<string, CacheEntry> = new Map();
+  private readonly debug: boolean;
 
   constructor(opts: HttpClientOptions) {
     this.baseUrl = (
       opts.baseUrl ?? "https://api.policeroleplay.community"
     ).replace(/\/$/, "");
     this.serverKey = opts.serverKey;
-    this.limiter = new RateCoordinator(opts.rpm ?? 60);
+    this.limiters = new RateLimiterManager({
+      requestsPerMinute: opts.rpm ?? 60,
+      maxConcurrency: opts.maxConcurrency,
+      debug: opts.debug,
+    });
     this.retries = Math.max(0, opts.retries ?? 3);
     this.userAgent = opts.userAgent;
     this.fetchImpl = opts.fetch ?? globalThis.fetch;
+    this.debug = Boolean(opts.debug);
 
     if (!this.fetchImpl) {
       throw new Error(
@@ -54,21 +62,26 @@ export class HttpClient {
       const cached = this.etagCache.get(cacheKey);
       if (cached?.etag) {
         headers.set("if-none-match", cached.etag);
+        this.log("etag-send", { url });
       }
     }
 
+    const limiter = this.limiters.forPath(path);
+
     const run = async (): Promise<T> => {
+      this.log("request", { url, method });
       const response = await this.fetchImpl(url, {
         ...init,
         method,
         headers,
       });
 
-      this.limiter.updateFromHeaders(response.headers);
+      limiter.updateFromHeaders(response.headers);
 
       if (cacheable && cacheKey && response.status === 304) {
         const cached = this.etagCache.get(cacheKey);
         if (cached) {
+          this.log("cache-hit", { url });
           return cached.data as T;
         }
       }
@@ -83,12 +96,18 @@ export class HttpClient {
           the previous payload.
         */
         if (response.ok && newEtag && cached && cached.etag === newEtag) {
+          this.log("cache-match", { url });
           return cached.data as T;
         }
       }
 
       if (!response.ok) {
-        throw await this.toHttpError(response);
+        const error = await this.toHttpError(response);
+        if (typeof error.retryAfterMs === "number") {
+          limiter.penalize(error.retryAfterMs);
+        }
+        this.log("http-error", { url, status: error.status });
+        throw error;
       }
 
       const payload = await this.parseBody<unknown>(response, url);
@@ -98,16 +117,20 @@ export class HttpClient {
         const etag = response.headers.get("etag");
         if (etag) {
           this.etagCache.set(cacheKey, { etag, data: validated });
+          this.log("cache-store", { url });
         }
       }
 
       return validated;
     };
 
-    return this.limiter.schedule(() => this.withRetries(run));
+    return this.withRetries(() => limiter.schedule(run), limiter);
   }
 
-  private async withRetries<T>(fn: () => Promise<T>): Promise<T> {
+  private async withRetries<T>(
+    fn: () => Promise<T>,
+    limiter: SmoothRateLimiter
+  ): Promise<T> {
     let attempt = 0;
     let lastErr: unknown;
 
@@ -122,12 +145,16 @@ export class HttpClient {
             break;
           }
 
-          const wait =
-            typeof error.retryAfterMs === "number"
-              ? error.retryAfterMs
-              : this.backoff(attempt);
+          const isRetryAfter = typeof error.retryAfterMs === "number";
+          const wait = isRetryAfter ? error.retryAfterMs : this.backoff(attempt);
 
-          await sleep(wait);
+          if (wait > 0) {
+            if (!isRetryAfter) {
+              limiter.penalize(wait);
+            }
+            this.log("retry", { attempt, wait });
+            await sleep(wait);
+          }
           attempt++;
           continue;
         }
@@ -204,6 +231,12 @@ export class HttpClient {
       typeof retryAfterSeconds === "number" ? retryAfterSeconds * 1000 : undefined;
     const message = body || response.statusText || "Request failed";
     return new HttpError(response.status, message, retryAfterMs);
+  }
+
+  private log(event: string, payload: Record<string, unknown>) {
+    if (!this.debug) return;
+    // eslint-disable-next-line no-console
+    console.debug(`[HttpClient] ${event}`, payload);
   }
 }
 

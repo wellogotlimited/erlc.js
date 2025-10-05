@@ -42,6 +42,14 @@ export class PRC {
 
 export { HttpClient, HttpError };
 export type { HttpClientOptions };
+export {
+  SmoothRateLimiter,
+  RateLimiterManager,
+} from "./core/limiter";
+export type {
+  SmoothRateLimiterOptions,
+  RateLimiterManagerOptions,
+} from "./core/limiter";
 export { parseRateHeaders } from "./utils/headers";
 
 export {
