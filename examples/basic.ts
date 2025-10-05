@@ -1,4 +1,4 @@
-import { PRC } from "../src/index.js";
+import { PRC } from "liberlc";
 
 async function main() {
   const api = new PRC({ serverKey: process.env.PRC_SERVER_KEY!, rpm: 60 });
