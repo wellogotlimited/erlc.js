@@ -12,6 +12,7 @@ A simple, rate-limited JavaScript/TypeScript wrapper for the [PRC Private Server
 - ✅ Automatic rate limit handling
 - ✅ All endpoints supported
 - ✅ TypeScript support with types included
+- ✅ E-tags, conditional requests, and caching
 
 ---
 
@@ -19,3 +20,4 @@ A simple, rate-limited JavaScript/TypeScript wrapper for the [PRC Private Server
 
 ```bash
 npm install erlc.js
+
