@@ -1,6 +1,6 @@
 {
   "name": "liberlc",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "A simple, rate-limited JavaScript/TypeScript wrapper for the PRC Private Server API.",
   "type": "module",
   "main": "dist/index.js",
